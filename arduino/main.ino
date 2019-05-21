@@ -93,10 +93,11 @@ void beginMainDisplay()
 void handleGetStatus()
 {
     char response[200];
-    sprintf(response, "{ \"status\": \"%s\", \"spinNumber\": %d, \"timeLeft\": %d, \"lastWinningNumber\": %d }",
+    sprintf(response, "{ \"status\": \"%s\", \"spinNumber\": %d, \"timeLeft\": %d, \"totalTime\": %d, \"lastWinningNumber\": %d }",
             gameState == WaitingToSpin ? "WaitingForSpin" : "Spinning",
             spinNumber,
             gameState == WaitingToSpin ? waitTimeToSpin : timeToSpin,
+            gameState == WaitingToSpin ? WaitToSpinTime : SpinTime,
             winningNumber);
     server.send(200, "application/json", response);
 }
