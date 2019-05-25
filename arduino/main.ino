@@ -11,7 +11,7 @@
 
 // Constants
 const unsigned char WaitToSpinTime = 20; // seconds between spins
-const unsigned char SpinTime = 10;       // seconds that takes to spin
+const unsigned char SpinTime = 5;       // seconds that takes to spin
 
 // Set these to your desired credentials.
 const char *ssid = "puie msd";
@@ -52,18 +52,18 @@ void setup()
     startTime = millis();
     randomSeed(analogRead(0));
 
-    // WiFi.softAP(ssid, password);
-    // IPAddress myIP = WiFi.softAPIP();
-    // Serial.print("AP IP address: ");
-    // Serial.println(myIP);
+    WiFi.softAP(ssid, password);
+    IPAddress myIP = WiFi.softAPIP();
+    Serial.print("AP IP address: ");
+    Serial.println(myIP);
 
-    WiFi.begin("free wifi", "apaplatarece");
+    // WiFi.begin("free wifi", "apaplatarece"); 
 
-    while (WiFi.status() != WL_CONNECTED)
-    {
-        delay(500);
-        Serial.print(".");
-    }
+    // while (WiFi.status() != WL_CONNECTED)
+    // {
+    //     delay(500);
+    //     Serial.print(".");
+    // }
 
     Serial.println("");
     Serial.println("WiFi connected");
@@ -172,6 +172,13 @@ void startSpinning()
 
 void startWaiting()
 {
+    spinNumber++;
+    waitTimeToSpin = WaitToSpinTime;
+    gameState = WaitingToSpin;
+}
+
+void chooseNumber()
+{
     winningNumber = random(36);
     if (lastNumberIndex >= 8)
     {
@@ -185,10 +192,6 @@ void startWaiting()
     {
         lastNumbers[lastNumberIndex++] = winningNumber;
     }
-
-    spinNumber++;
-    waitTimeToSpin = WaitToSpinTime;
-    gameState = WaitingToSpin;
 }
 
 void handleSecondPassed()
@@ -212,6 +215,7 @@ void handleSecondPassed()
         timeToSpin--;
         if (timeToSpin == 0)
         {
+            chooseNumber();
             drawLastNumbers();
             startWaiting();
         }
