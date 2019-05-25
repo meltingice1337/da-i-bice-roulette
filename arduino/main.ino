@@ -14,7 +14,7 @@ const unsigned char WaitToSpinTime = 20; // seconds between spins
 const unsigned char SpinTime = 5;       // seconds that takes to spin
 
 // Set these to your desired credentials.
-const char *ssid = "puie msd";
+const char *ssid = "da-i-bice-roulette";
 const char *password = "12345678";
 
 enum State
