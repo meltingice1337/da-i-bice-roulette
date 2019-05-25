@@ -10,6 +10,7 @@ import {
   View,
   TouchableNativeFeedback
 } from 'react-native';
+import * as Progress from 'react-native-progress';
 
 import { RouleteBoard } from '../components/RouleteBoard';
 import { RouleteBet } from '../components/RouleteBet';
@@ -25,18 +26,40 @@ export default class HomeScreen extends React.Component {
     this.state = {
       betMap: {},
       betHistory: [],
-      credits: 1000
+      credits: 1000,
+      initialCredits: 1000,
+      gameStatus: {
+        "status": null,
+        "spinNumber": null,
+        "timeLeft": null,
+        "totalTime": 20,
+        "lastWinningNumber": null
+      },
+      winningMessage: null
     }
 
     this.onPress = this.onPress.bind(this);
     this.onUndo = this.onUndo.bind(this);
     this.onReset = this.onReset.bind(this);
+    this.onRefill = this.onRefill.bind(this);
+
+    setInterval(this.checkStatus.bind(this), 1000);
   }
 
   render() {
     return (
       <View style={styles.container}>
         <View style={styles.rouleteActions}>
+          <View>
+            <Text style={styles.spinNumber}>Spin #{this.state.gameStatus.spinNumber}</Text>
+          </View>
+          <View style={{ flex: 1, marginLeft: 10, marginRight: 10 }}>
+            <Progress.Bar progress={this.calculateProgressValue()} width={null} />
+            <Text style={{ ...styles.spinNumber, ...styles.gameState }}>{this.state.gameStatus.status === 'WaitingForSpin' ? 'Place your bets !' : 'No more bets ! Roulette Spinning ...'}</Text>
+          </View>
+          <View>
+            <Text style={styles.spinNumber}>Number {this.state.gameStatus.lastWinningNumber}</Text>
+          </View>
         </View>
         <View style={styles.rouleteContainer}>
           <View style={styles.rouleteColumn}>
@@ -82,6 +105,8 @@ export default class HomeScreen extends React.Component {
           <View style={styles.creditsContainer}>
             <Text style={{ color: 'white' }}>Credits: {this.state.credits}</Text>
           </View>
+          {this.renderWinning()}
+          <ActionButton style={styles.undoAction} disabled={this.state.initialCredits !== 0} onPress={this.onRefill} title="Refill Credits" />
           <ActionButton style={styles.undoAction} disabled={this.state.betHistory.length === 0} onPress={this.onUndo} title="Undo" />
           <ActionButton disabled={this.state.betHistory.length === 0} onPress={this.onReset} title="Reset" />
 
@@ -98,41 +123,86 @@ export default class HomeScreen extends React.Component {
     Expo.ScreenOrientation.allowAsync(Expo.ScreenOrientation.Orientation.LANDSCAPE);
   }
 
-  onPress(betType) {
-    if (this.state.credits > 0) {
-      const betMap = { ...this.state.betMap };
-      const betHistory = [...this.state.betHistory];
-      const creditsIncrease = 100;
-      betMap[betType] = betMap[betType] ? betMap[betType] + creditsIncrease : creditsIncrease;
-      betHistory.push({ betType, creditsIncrease });
+  checkStatus() {
+    fetch('http://192.168.4.1/status', {
+      method: 'GET'
+    })
+      .then(response => response.json())
+      .then((gameStatus) => {
+        if (gameStatus.status === 'WaitingForSpin' && this.state.gameStatus.status === 'Spinning') {
+          const winning = WinningsHelper.calculateWin(gameStatus.lastWinningNumber, this.state.betMap);
+          const newCredits = this.state.credits + winning;
+          const winningMessage = `The winning number is: ${gameStatus.lastWinningNumber}. ` + (winning > 0 ? `You have won ${winning} credits !` : 'You didnt win anything !');
+          setTimeout(() => { this.setState({ winningMessage: null }) }, 10000);
+          this.setState({ initialCredits: newCredits, credits: newCredits, betMap: [], betHistory: [], winningMessage });
+        }
+        this.setState({ gameStatus });
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+  }
 
-      this.setState({ betMap, betHistory, credits: this.state.credits - creditsIncrease });
+  calculateProgressValue() {
+    const { gameStatus } = this.state;
+    if (gameStatus) {
+      return (gameStatus.totalTime - gameStatus.timeLeft) / gameStatus.totalTime;
+    } else {
+      return 0;
+    }
+  }
+
+  renderWinning() {
+    return (
+      <View style={{ flex: 1, width: '100%' }}>
+        {this.state.winningMessage && <Text style={{ color: 'grey' }}>{this.state.winningMessage}</Text>}
+      </View>
+    )
+  }
+
+  onPress(betType) {
+    if (this.state.gameStatus.status !== 'Spinning') {
+      if (this.state.credits > 0) {
+        const betMap = { ...this.state.betMap };
+        const betHistory = [...this.state.betHistory];
+        const creditsIncrease = 100;
+        betMap[betType] = betMap[betType] ? betMap[betType] + creditsIncrease : creditsIncrease;
+        betHistory.push({ betType, creditsIncrease });
+
+        this.setState({ betMap, betHistory, credits: this.state.credits - creditsIncrease });
+      }
     }
   }
 
   onUndo() {
-    if (this.state.betHistory.length > 0) {
-      const lastBet = this.state.betHistory[this.state.betHistory.length - 1];
-      const betMap = { ...this.state.betMap }
-      betMap[lastBet.betType] -= lastBet.creditsIncrease;
-      if (betMap[lastBet.betType] === 0) {
-        delete betMap[lastBet.betType];
-      }
+    if (this.state.gameStatus.status !== 'Spinning') {
+      if (this.state.betHistory.length > 0) {
+        const lastBet = this.state.betHistory[this.state.betHistory.length - 1];
+        const betMap = { ...this.state.betMap }
+        betMap[lastBet.betType] -= lastBet.creditsIncrease;
+        if (betMap[lastBet.betType] === 0) {
+          delete betMap[lastBet.betType];
+        }
 
-      this.setState({
-        betHistory: this.state.betHistory.slice(0, this.state.betHistory.length - 1),
-        credits: this.state.credits + lastBet.creditsIncrease,
-        betMap,
-      });
+        this.setState({
+          betHistory: this.state.betHistory.slice(0, this.state.betHistory.length - 1),
+          credits: this.state.credits + lastBet.creditsIncrease,
+          betMap,
+        });
+      }
+    }
+  }
+
+  onRefill() {
+    if (this.state.initialCredits === 0) {
+      this.setState({ credits: 1000, initialCredits: 1000 });
     }
   }
 
   onReset() {
-    // this.setState({ betMap: {}, betHistory: [], credits: 1000 });
-    min = Math.ceil(0);
-    max = Math.floor(36);
-    const number = Math.floor(Math.random() * (max - min + 1)) + min;
-    console.log({ number, winning: WinningsHelper.calculateWin(number, this.state.betMap) });
+    if (this.state.gameStatus.status !== 'Spinning') {
+      this.setState({ betMap: {}, betHistory: [], credits: this.state.initialCredits });
+    }
   }
 }
 
@@ -170,10 +240,18 @@ const styles = StyleSheet.create({
     width: '90%',
     alignItems: 'center',
     flexDirection: 'row',
-    borderWidth: 1
+  },
+  gameState: {
+    position: 'absolute',
+    top: 10,
+    width: '100%',
+    textAlign: 'center'
+  },
+  spinNumber: {
+    color: 'white'
   },
   creditsContainer: {
-    flex: 1,
+    marginRight: 10
   },
   undoAction: {
     marginRight: 10
