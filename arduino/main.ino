@@ -168,7 +168,10 @@ void startSpinning()
 {
     timeToSpin = SpinTime;
     gameState = Spinning;
+}
 
+void startWaiting()
+{
     winningNumber = random(36);
     if (lastNumberIndex >= 8)
     {
@@ -182,10 +185,7 @@ void startSpinning()
     {
         lastNumbers[lastNumberIndex++] = winningNumber;
     }
-}
 
-void startWaiting()
-{
     spinNumber++;
     waitTimeToSpin = WaitToSpinTime;
     gameState = WaitingToSpin;
